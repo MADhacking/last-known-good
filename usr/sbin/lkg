@@ -1,0 +1,50 @@
+#! /bin/bash
+
+# Load our configuration file.
+source /etc/lkg
+
+# Load the RC functions (ebegin, eend, etc).
+source /lib/rc/sh/functions.sh
+
+ebegin "Last Known Good (LKG)"
+rv=0
+
+# Loop through the snapshot candidates renaming them
+# so they include a time-stamp.
+timestamp="$(date +%Y%m%d%H%M%S)"
+while read lv_name vg_name
+do
+	nlv_name="${lv_name%_lkgc}_lkg_${timestamp}"
+lvrename ${vg_name} ${lv_name} ${nlv_name} >/dev/null
+	(( $? > 0 )) && rv=1
+done < <(lvs --noheadings --separator " " -o lv_name,vg_name @lkg_candidate)
+
+# Tag any snapshot candidates as snapshots and
+# remove any snapshot candidate tags.
+lvchange --addtag @lkg_snapshot @lkg_candidate >/dev/null
+(( $? > 0 )) && rv=1
+lvchange --deltag @lkg_candidate @lkg_candidate >/dev/null
+(( $? > 0 )) && rv=1
+
+# Loop through the volumes tagged with @lkg_snapshot.
+last_origin=""
+snap_count=0
+while read lv_name origin vg_name
+do
+	[[ -z "${last_origin}" ]] && last_origin="${origin}"
+	
+	if [[ "${last_origin}" = "${origin}" ]]
+	then
+		let snap_count++
+		if (( ${snap_count} > ${SNAPSHOT_RETAIN} ))
+		then
+			lvremove --force "${vg_name}/${lv_name}" >/dev/null
+			(( $? > 0 )) && rv=1
+		fi
+	else
+		last_origin="${origin}"
+		snap_count=1
+	fi
+done < <(lvs --noheadings --separator " " -o lv_name,origin,vg_name --sort origin,-lv_name @lkg_snapshot)
+
+eend $rv

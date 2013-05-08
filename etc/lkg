@@ -1,0 +1,2 @@
+# Number of snapshots to retain.
+SNAPSHOT_RETAIN=1
