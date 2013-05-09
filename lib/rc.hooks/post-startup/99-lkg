@@ -1,0 +1,10 @@
+#! /bin/bash
+
+# Load the RC functions (ebegin, eend, etc).
+source /lib/rc/sh/functions.sh
+
+ebegin "Last Known Good (LKG)"
+
+/usr/sbin/lkgtests "$@" && /usr/sbin/lkg
+
+eend $?

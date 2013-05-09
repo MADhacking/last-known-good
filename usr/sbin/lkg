@@ -1,5 +1,9 @@
 #! /bin/bash
 
+# Configure default values
+LKG_LOG="/var/log/lkg"
+SNAPSHOT_RETAIN=2
+
 # Load our configuration file.
 source /etc/lkg
 
@@ -22,10 +26,11 @@ function link_and_remove_images()
 	done < <(find /boot/lkg -name ${1}'*' | sort --reverse)
 }
 
-ebegin "Last Known Good (LKG)"
-
 rv=0
 had_snapshots=0
+
+echo -e "\n$(date)\n" >> ${LKG_LOG}
+echo "Renaming snapshot candidates" >> ${LKG_LOG}
 
 # Loop through the snapshot candidates renaming them
 # so they include a time-stamp.
@@ -33,14 +38,19 @@ timestamp="$(date +%Y%m%d%H%M%S)"
 while read lv_name vg_name
 do
 	nlv_name="${lv_name%_lkgc}_lkg_${timestamp}"
-	lvrename ${vg_name} ${lv_name} ${nlv_name} >/dev/null
+	lvrename ${vg_name} ${lv_name} ${nlv_name} >> ${LKG_LOG}
 	(( $? > 0 )) && rv=1
 	had_snapshots=1
 done < <(lvs --noheadings --separator " " -o lv_name,vg_name @lkg_candidate)
 
 # If we didn't find any snapshot candidates then there is no
 # point continuing.
-(( ${had_snapshots} )) || exit
+if (( ${had_snapshots} == 0 ))
+then
+	echo "No LKG candidate snapshots located!" >> ${LKG_LOG}
+	eerror "No LKG candidate snapshots located!"
+	exit 0
+fi
 
 # Mount the /boot partition and make duplicates of the hypervisor, 
 # kernel and initrd images with the same time-stamp that we just used.
@@ -48,20 +58,23 @@ done < <(lvs --noheadings --separator " " -o lv_name,vg_name @lkg_candidate)
 # links to point to the new kernel and initrd images we created above.
 # We probably also have more kernel and initrd images than are specified
 # in SNAPSHOT_RETAIN so we can delete the ones we are done with.
-mount /boot > /dev/null 2>&1
-link_and_remove_images hyperv ${timestamp} || rv=1 
+echo "Duplicating and linking hyperv, kernel and initrd" >> ${LKG_LOG}
+mount /boot >> ${LKG_LOG} 2>&1
+link_and_remove_images hyperv ${timestamp}
 link_and_remove_images kernel ${timestamp} || rv=1
 link_and_remove_images initrd ${timestamp} || rv=1
 umount /boot > /dev/null 2>&1
 
 # Tag any snapshot candidates as snapshots and
 # remove any snapshot candidate tags.
-lvchange --addtag @lkg_snapshot @lkg_candidate >/dev/null  || rv=1
-lvchange --deltag @lkg_candidate @lkg_candidate >/dev/null || rv=1
+echo "Tagging snapshot candidates as snapshots" >> ${LKG_LOG}
+lvchange --addtag @lkg_snapshot @lkg_candidate >> ${LKG_LOG} || rv=1
+lvchange --deltag @lkg_candidate @lkg_candidate >> ${LKG_LOG} || rv=1
 
 # Loop through the volumes tagged with @lkg_snapshot.  If we
 # have more than SNAPSHOT_RETAIN snapshots (for each volume)
 # then remove the extra snapshots.
+echo "Deleting extraneous snapshots" >> ${LKG_LOG}
 last_origin=""
 snap_count=1
 while read lv_name origin vg_name
@@ -72,7 +85,7 @@ do
 	then
 		if (( ${snap_count} >= ${SNAPSHOT_RETAIN} ))
 		then
-			lvremove --force "${vg_name}/${lv_name}" >/dev/null || rv=1
+			lvremove --force "${vg_name}/${lv_name}" >> ${LKG_LOG} || rv=1
 		fi
 		let snap_count++
 	else
@@ -81,4 +94,5 @@ do
 	fi
 done < <(lvs --noheadings --separator " " -o lv_name,origin,vg_name --sort origin,-lv_name @lkg_snapshot)
 
-eend $rv
+echo "LKG completed with rv=${rv}" >> ${LKG_LOG}
+exit $rv

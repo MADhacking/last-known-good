@@ -1,2 +1,11 @@
 # Number of snapshots to retain.
-SNAPSHOT_RETAIN=1
+# SNAPSHOT_RETAIN=2
+
+# Display verbose test messages during boot? (0=no, 1=yes)
+# LKG_TEST_VERBOSE=1
+
+# Path to the LKG test log. (/dev/null disables)
+# LKG_TEST_LOG="/var/log/lkg.tests"
+
+# Path to the LKG log. (/dev/null disables)
+# LKG_LOG="/var/log/lkg"

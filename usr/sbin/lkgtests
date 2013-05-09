@@ -1,0 +1,37 @@
+#! /bin/bash
+
+LKG_TEST_LOG="/var/log/lkg.tests"
+LKG_TEST_VERBOSE=1
+
+# Load our configuration file.
+source /etc/lkg
+
+# Load the RC functions (ebegin, eend, etc).
+source /lib/rc/sh/functions.sh
+
+# Loop through all the executable scripts in /lib/lkg.tests/
+# Run each script in turn passing the same parameters we were.
+# If any of the scripts fail then we can return the error value.
+# Assuming all the scripts succeed then all is well and we're done.
+	
+	
+echo -e "\n$(date)\n" >> ${LKG_TEST_LOG}
+
+(( ${LKG_TEST_VERBOSE} )) && eindent
+
+rv=0
+while read test_script
+do
+	trv=0
+	script_name="${test_script##*/}"
+	script_name="${script_name%.sh}"
+	(( ${LKG_TEST_VERBOSE} )) && ebegin "${script_name}"
+		echo "Executing test: ${test_script}" >> ${LKG_TEST_LOG}
+		${test_script} "$@" >> ${LKG_TEST_LOG} 2>&1 || trv=$?
+	(( ${LKG_TEST_VERBOSE} )) && eend ${trv}
+	(( $trv )) && rv=${trv}
+done < <(find -L /lib/lkg.tests -name '*' -executable -type f | sort)
+
+(( ${LKG_TEST_VERBOSE} )) && eoutdent
+
+exit $rv
