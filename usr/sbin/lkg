@@ -76,21 +76,21 @@ lvchange --deltag @lkg_candidate @lkg_candidate >> ${LKG_LOG} || rv=1
 # then remove the extra snapshots.
 echo "Deleting extraneous snapshots" >> ${LKG_LOG}
 last_origin=""
-snap_count=1
 while read lv_name origin vg_name
 do
-	[[ -z "${last_origin}" ]] && last_origin="${origin}"
-	
+	if [[ "${last_origin}" != "${origin}" ]]
+	then
+		last_origin="${origin}"
+		snap_count=1
+	fi
+		
 	if [[ "${last_origin}" = "${origin}" ]]
 	then
-		if (( ${snap_count} >= ${SNAPSHOT_RETAIN} ))
+		if (( ${snap_count} > ${SNAPSHOT_RETAIN} ))
 		then
 			lvremove --force "${vg_name}/${lv_name}" >> ${LKG_LOG} || rv=1
 		fi
 		let snap_count++
-	else
-		last_origin="${origin}"
-		snap_count=1
 	fi
 done < <(lvs --noheadings --separator " " -o lv_name,origin,vg_name --sort origin,-lv_name @lkg_snapshot)
 
