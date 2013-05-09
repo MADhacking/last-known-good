@@ -1,5 +1,13 @@
 #! /bin/bash
 
+# Check that we are not being run from a snapshot and
+# quit if we are.
+if grep -q "rc.lkg.snapshot" < /proc/cmdline
+then
+	echo "lkg should not be run from a snapshot"
+	exit 1
+fi
+
 # Configure default values
 LKG_LOG="/var/log/lkg"
 SNAPSHOT_RETAIN=2
