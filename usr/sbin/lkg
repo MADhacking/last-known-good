@@ -23,7 +23,7 @@ function link_and_remove_images()
 	[ -f "/boot/${1}" ] || return 1
 
 	mkdir -p /boot/lkg
-	cp --dereference "/boot/${1}" "/boot/lkg/initrd_${2}"
+	cp --dereference "/boot/${1}" "/boot/lkg/${1}_${2}"
 	
 	local link_num=1
 	while read img_name
