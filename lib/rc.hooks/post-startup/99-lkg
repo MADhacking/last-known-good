@@ -2,7 +2,7 @@
 
 # Check that we are not being run from a snapshot and
 # quit if we are.
-grep -q "rc.lkg.snapshot" < /proc/cmdline && exit
+grep -q "rd.lkg.snapshot" < /proc/cmdline && exit
 
 # Load the RC functions (ebegin, eend, etc).
 source /lib/rc/sh/functions.sh
